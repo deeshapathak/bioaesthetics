@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "m3-rejuvenation-screen"
+version = "0.1.0"
+description = "M3 Rejuvenation Screen — old→young skin signature + L1000 connectivity reversal scoring (Genesis Appendix A)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "scipy>=1.11",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Real-data adapters (not required for the synthetic end-to-end run)
+real = [
+    "cmapPy>=4.0",      # parse L1000 .gctx
+    "gseapy>=1.1",      # ssGSEA / axis scoring
+    "scanpy>=1.10",     # single-cell (Tabula Muris Senis)
+]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+m3 = "m3.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

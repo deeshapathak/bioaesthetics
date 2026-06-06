@@ -1,0 +1,100 @@
+# =============================================================================
+# M3 Rejuvenation Screen — pipeline config (Genesis Appendix A)
+#
+# The single source of truth: pinned dataset accessions + versions, a fixed
+# random seed, and the §A4 go/no-go thresholds. No hard-coded paths or
+# unverified IDs anywhere else in the codebase (A6: "Config-driven, pinned").
+# =============================================================================
+
+seed: 1234
+
+# synthetic | real
+#   synthetic — self-contained: a planted old→young signal + known rejuvenators,
+#               so the whole pipeline runs end-to-end and the validation gates
+#               exercise real signal. No external accounts needed.
+#   real      — pull from the accessions below via the adapters in m3/data.
+#               Requires a CLUE.io account, GTEx/dbGaP access, etc.
+mode: synthetic
+
+paths:
+  data: data            # raw / downloaded inputs (real mode)
+  cache: .cache/m3      # staged, cached stage artifacts (A6)
+  outputs: outputs      # ranked table + validation report (the deliverables)
+
+# ------------------------------------------------------------------ datasets
+# Pinned accessions (A1). In synthetic mode these are recorded for provenance
+# only; in real mode the adapters resolve them. Verify accessions + sample
+# metadata before ingest — do NOT trust unverified IDs (A2.1).
+datasets:
+  lincs_l1000_phase1:
+    accession: GSE92742          # via CLUE.io, Level 5 replicate-collapsed
+    role: compound perturbation signatures
+  lincs_l1000_phase2:
+    accession: GSE70138          # via CLUE.io; combine with Phase I
+    role: more compounds
+  gtex_skin:
+    portal: GTEx v8
+    tissues:
+      - Skin - Sun Exposed (Lower leg)
+      - Skin - Not Sun Exposed (Suprapubic)
+    role: old→young / photoaging signature
+  tabula_muris_senis:
+    accession: GSE132042         # figshare / GEO
+    role: cross-tissue young↔old direction (context)
+  senmayo:
+    source: Saul 2022 supplement
+    role: senescence / SASP axis
+  cellage_msigdb:
+    source: genomics.senescence.info; MSigDB Hallmark
+    role: curated aging / senescence axes
+
+# ------------------------------------------------------------- signatures (A2)
+signatures:
+  padj: 0.05                 # FDR cutoff for age-DE
+  top_n: 150                 # size of UP / DOWN gene sets per direction
+  covariates: [sex, RIN, ischemic_time]
+  meta:                      # A2.1 — strengthen Signature A across cohorts
+    method: random_effects   # random_effects (DerSimonian-Laird) | rank_aggregation
+    min_replication: 2       # gene must replicate in >= this many cohorts (GTEx counts as 1)
+
+# ------------------------------------------------------ gene-space harmonize (A3.1)
+harmonize:
+  id_namespace: hgnc_symbol  # common identifier both sides map to
+  landmark_only: true        # restrict query to L1000-measured (landmark) space
+  min_coverage: 0.25         # warn / weight-down if < this fraction of sig genes survive
+
+# --------------------------------------------------------- connectivity (A3)
+connectivity:
+  method: weighted_ks        # CMap weighted-KS connectivity (Spearman is a baseline)
+  aggregate: tau             # collapse cell line / dose per compound (CLUE tau vs Touchstone)
+  skin_relevant_cell_lines: [NPC, HA1E, ASC, FIBRBLST, KERTNCYT]  # up-weight where available
+
+# ----------------------------------------------------------- validation (A4)
+validation:
+  permutations: 1000         # null connectivity via gene-label permutation → q-values
+  top_decile: 0.10
+  # go/no-go: ship to a demo only if ALL hold
+  go_no_go:
+    recovery_auc_min: 0.70   # blind held-out recovery ROC-AUC (PRIMARY gate)
+    top_decile_q_max: 0.10   # known actives enrich in top decile at q < this
+    require_directional_controls: true  # aging-promoters must rank near the bottom
+
+# --------------------------------------------- synthetic-mode generator knobs
+# Only used when mode == synthetic. Tunes the planted signal so the gates have
+# real (not trivial) signal to recover.
+synthetic:
+  n_genes: 2000
+  n_landmark: 978            # L1000 landmark count
+  n_aging_genes: 300         # genes that truly move with age
+  gtex_donors: 90            # per site
+  external_cohort_donors: 60
+  n_compounds: 240
+  n_known_actives: 24        # retinoids / rapamycin / senolytics (positives)
+  n_aging_promoters: 16      # senescence-inducing / genotoxic (negative controls)
+  cell_lines: [NPC, HA1E, ASC, A375, MCF7, PC3, VCAP]
+  doses: [0.04, 0.12, 0.37, 1.11, 3.33, 10.0]   # µM
+  effect:
+    age_beta: 0.9            # strength of the planted aging effect
+    site_beta: 0.7           # photoexposure / site axis (Signature B)
+    reverser_strength: 1.0   # how hard known actives reverse the signature
+    noise: 1.0

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+# anchored to repo root so src/m3/data/ (source) is NOT ignored
+/.cache/
+/outputs/
+/data/
